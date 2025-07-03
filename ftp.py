@@ -17,7 +17,7 @@ COMMENTS_FILE_NAME = 'comments.json'
 
 # Load global metadata if exists
 if os.path.exists(GLOBAL_META_FILE):
-    with open(GLOBAL_META_FILE, 'r') as f:
+    with open(GLOBAL_META_FILE, 'r',encoding='utf-8') as f:
         global_metadata = json.load(f)
 else:
     global_metadata = {}
@@ -26,7 +26,7 @@ def get_background_color(ip):
     if ip not in global_metadata:
         color = "#%06x" % random.randint(0, 0xFFFFFF)
         global_metadata[ip] = color
-        with open(GLOBAL_META_FILE, 'w') as f:
+        with open(GLOBAL_META_FILE, 'w',encoding='utf-8') as f:
             json.dump(global_metadata, f, ensure_ascii=False, indent=4)
     return global_metadata[ip]
 
@@ -47,19 +47,18 @@ def index(username):
     
     # Load metadata if exists
     if os.path.exists(meta_file):
-        with open(meta_file, 'r') as f:
+        with open(meta_file, 'r',encoding='utf-8') as f:
             metadata = json.load(f)
     else:
         metadata = {}
     
     # Load comments if exists
     if os.path.exists(comments_file):
-        with open(comments_file, 'r') as f:
+        with open(comments_file, 'r',encoding='utf-8') as f:
             comments = json.load(f)
-            comments = comments[::-1]
     else:
         comments = []
-    
+
     reverse_comments = request.args.get('reverse_comments', 'false').lower() == 'true'
     if reverse_comments:
         comments = comments[::-1]
@@ -170,7 +169,7 @@ def index(username):
     </form>
     <h2>Upload Folder</h2>
     <form method=post enctype=multipart/form-data action="/{{ username }}/upload_folder">
-      <input type=file name=file id=folderInput webkitdirectory mozdirectory onchange="checkFolder()">
+      <input type=file name=file id=folderInput webkitdirectory mozdirectory onchange="checkFolder() multiple">
       <input type=submit value="Upload Folder" id=uploadFolderButton disabled class="disabled-upload-button">
     </form>
     <h1>Download Files</h1>
@@ -208,7 +207,7 @@ def index(username):
         {% for comment in comments %}
         <li class="comment-item file-actions" ondblclick="toggleComment('{{ loop.index0 }}')" style="background-color: {{ comment['color'] }}; color: {{ get_text_color(comment['color']) }};">
         {{ comment['time'] }} - {{ comment['ip'] }}: 
-        <button onclick="confirmCommentDeletion('{{ loop.index0 }}')">Delete</button>
+        <button onclick="confirmCommentDeletion('{{ loop.index }}')">Delete</button>
         -  
         <button onclick='copyToClipboard({{ comment["text"] | tojson | safe }})'>Copy</button>
         <div id="comment-{{ loop.index0 }}" style="display:block;">
@@ -216,7 +215,6 @@ def index(username):
         </div>
         </li>
         {% endfor %}
-
     </ul>
     <script>
       function toggleAllComments(expand) {
@@ -291,7 +289,10 @@ function showCopyMessage(message) {
       }
       function confirmCommentDeletion(commentIndex) {
         if (confirm('Are you sure you want to delete this comment?')) {
-          window.location.href = '/{{ username }}/delete_comment/' + commentIndex;
+          const currentUrl = new URL(window.location.href);
+          const reverseComments = currentUrl.searchParams.get('reverse_comments') === 'true';
+          const adjustedIndex = reverseComments ? {{ comments|length }} - commentIndex : commentIndex - 1;
+          window.location.href = '/{{ username }}/delete_comment/' + adjustedIndex;
         }
       }
       function checkFile() {
@@ -354,7 +355,7 @@ def upload_file(username):
         
         # Load metadata
         if os.path.exists(meta_file):
-            with open(meta_file, 'r') as f:
+            with open(meta_file, 'r',encoding='utf-8') as f:
                 metadata = json.load(f)
         else:
             metadata = {}
@@ -364,8 +365,8 @@ def upload_file(username):
             'upload_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
             'upload_ip': request.remote_addr
         }
-        with open(meta_file, 'w') as f:
-            json.dump(metadata, f, ensure_ascii=False)
+        with open(meta_file, 'w',encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False,indent=4)
     
     return f'<script>window.location.href = "/{username}/?message=File upload completed successfully!";</script>'
 
@@ -412,7 +413,7 @@ def upload_folder(username):
         'upload_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
         'upload_ip': request.remote_addr
     }
-    with open(meta_file, 'w') as f:
+    with open(meta_file, 'w',encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False)
     
     return f'<script>window.location.href = "/{username}/?message=Folder upload completed successfully!";</script>'
@@ -432,11 +433,11 @@ def delete_file(username, filename):
         os.remove(file_path)
         # Remove metadata
         if os.path.exists(meta_file):
-            with open(meta_file, 'r') as f:
+            with open(meta_file, 'r',encoding='utf-8') as f:
                 metadata = json.load(f)
             if filename in metadata:
                 del metadata[filename]
-                with open(meta_file, 'w') as f:
+                with open(meta_file, 'w',encoding='utf-8') as f:
                     json.dump(metadata, f, ensure_ascii=False, indent=4)
         return f'<script>window.location.href = "/{username}/?message=File deleted successfully!";</script>'
     else:
@@ -470,7 +471,7 @@ def add_comment(username):
     
     # Load comments
     if os.path.exists(comments_file):
-        with open(comments_file, 'r') as f:
+        with open(comments_file, 'r',encoding='utf-8') as f:
             comments = json.load(f)
     else:
         comments = []
@@ -484,8 +485,8 @@ def add_comment(username):
     })
     
     # Save comments
-    with open(comments_file, 'w') as f:
-        json.dump(comments, f, indent=4)
+    with open(comments_file, 'w',encoding='utf-8') as f:
+        json.dump(comments, f, indent=4, ensure_ascii=False)
     
     return f'<script>window.location.href = "/{username}/?message=Comment added successfully!";</script>'
 
@@ -496,7 +497,7 @@ def delete_comment(username, comment_index):
     
     # Load comments
     if os.path.exists(comments_file):
-        with open(comments_file, 'r') as f:
+        with open(comments_file, 'r',encoding='utf-8') as f:
             comments = json.load(f)
     else:
         comments = []
@@ -504,11 +505,11 @@ def delete_comment(username, comment_index):
     # Delete the specified comment
     if 0 <= comment_index < len(comments):
         del comments[comment_index]
-        with open(comments_file, 'w') as f:
-            json.dump(comments, f, indent=4)
+        with open(comments_file, 'w',encoding='utf-8') as f:
+            json.dump(comments, f, indent=4, ensure_ascii=False)
         return f'<script>window.location.href = "/{username}/?message=Comment deleted successfully!";</script>'
     else:
         return f'<script>window.location.href = "/{username}/?message=Comment not found!";</script>'
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
