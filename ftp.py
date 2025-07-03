@@ -515,10 +515,10 @@ function showCopyMessage(message) {
         const files = e.dataTransfer.files;
         const items = e.dataTransfer.items;
         if (hasDroppedFolder(files, items)) {
-          uploadFolder(files);
-        } else {
-          uploadFiles(files);
+          alert('Folder drops are not supported here. Use the folder upload form instead.');
+          return;
         }
+        uploadFiles(files);
       });
 
       document.getElementById('folderUploadForm').addEventListener('submit', function(e) {

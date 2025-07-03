@@ -5,7 +5,7 @@ Simple web-based file sharing built with Flask.
 
 ### Features
 - Upload single or multiple files with progress display
-- Drag-and-drop area for quick upload of files or folders
+- Drag-and-drop area for quick upload of files (folders are rejected)
 - Upload folders as ZIP archives
 - Download and delete uploaded files
 - Batch download selected files by clicking rows to select
@@ -24,7 +24,7 @@ Simple web-based file sharing built with Flask.
 
 ### 功能
 - 支持单文件和多文件上传并显示进度
-- 提供拖拽区域快速上传文件或文件夹
+- 提供拖拽区域快速上传文件（不支持拖入文件夹）
 - 文件夹上传会自动压缩成 ZIP
 - 可下载或删除已上传的文件
 - 支持点击行选择并批量下载
@@ -43,7 +43,7 @@ Flask で作られたシンプルなファイル共有ツールです。
 
 ### 機能
 - 進捗表示付きでファイルを1つまたは複数アップロード
-- ドラッグ&ドロップ用エリア（ファイルやフォルダを直接ドロップ可能）
+- ドラッグ&ドロップ用エリア（ファイルのみ対応、フォルダ不可）
 - フォルダを ZIP としてアップロード
 - アップロードしたファイルのダウンロードと削除
 - 行をクリックして複数のファイルをまとめてダウンロード
