@@ -1,10 +1,12 @@
-from flask import Flask, request, send_from_directory, render_template_string
+from flask import Flask, request, send_from_directory, render_template_string, send_file
 import os
 import datetime
 import json
 import random
 import shutil
 import zipfile
+import io
+import logging
 
 app = Flask(__name__)
 BASE_UPLOAD_FOLDER = 'uploads'
@@ -14,6 +16,16 @@ os.makedirs(BASE_UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(TEMP_UPLOAD_FOLDER, exist_ok=True)
 META_FILE_NAME = 'metadata.json'
 COMMENTS_FILE_NAME = 'comments.json'
+META_FOLDER_NAME = '.meta'
+VERSIONS_FOLDER_NAME = '.versions'
+LOG_FILE = 'server.log'
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(message)s',
+    filename=LOG_FILE,
+    encoding='utf-8'
+)
 
 # Load global metadata if exists
 if os.path.exists(GLOBAL_META_FILE):
@@ -38,12 +50,28 @@ def get_text_color(hex_color):
 
 app.jinja_env.globals.update(get_text_color=get_text_color)
 
+def log_action(ip, action):
+    """Record an action performed by an IP."""
+    logging.info(f"{ip} {action}")
+
+def archive_file(upload_folder, filename):
+    """Save current version of a file before overwriting or deleting."""
+    src = os.path.join(upload_folder, filename)
+    if not os.path.exists(src):
+        return
+    versions_dir = os.path.join(upload_folder, VERSIONS_FOLDER_NAME, filename)
+    os.makedirs(versions_dir, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    shutil.move(src, os.path.join(versions_dir, f'{timestamp}_{filename}'))
+
 @app.route('/<username>/')
 def index(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
     os.makedirs(upload_folder, exist_ok=True)
-    meta_file = os.path.join(upload_folder, META_FILE_NAME)
-    comments_file = os.path.join(upload_folder, COMMENTS_FILE_NAME)
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    os.makedirs(meta_folder, exist_ok=True)
+    meta_file = os.path.join(meta_folder, META_FILE_NAME)
+    comments_file = os.path.join(meta_folder, COMMENTS_FILE_NAME)
     
     # Load metadata if exists
     if os.path.exists(meta_file):
@@ -51,6 +79,9 @@ def index(username):
             metadata = json.load(f)
     else:
         metadata = {}
+
+    files = {fname: meta for fname, meta in metadata.items()
+             if os.path.exists(os.path.join(upload_folder, fname))}
     
     # Load comments if exists
     if os.path.exists(comments_file):
@@ -58,6 +89,8 @@ def index(username):
             comments = json.load(f)
     else:
         comments = []
+
+    log_action(request.remote_addr, f"view index for {username}")
 
     reverse_comments = request.args.get('reverse_comments', 'false').lower() == 'true'
     if reverse_comments:
@@ -158,22 +191,42 @@ def index(username):
         .file-actions a:hover {
           text-decoration: underline;
         }
+        .drop-area {
+          border: 2px dashed #007bff;
+          padding: 20px;
+          text-align: center;
+          margin-bottom: 10px;
+          color: #666;
+        }
+        .drop-area.dragover {
+          background-color: #e6f7ff;
+          border-color: #1890ff;
+          color: #000;
+        }
+        .selected-row {
+          background-color: #d0e8ff;
+        }
       </style>
     </head>
     <body>
     <h1>Upload a File or Folder</h1>
     <h2>Upload Individual File</h2>
-    <form method=post enctype=multipart/form-data action="/{{ username }}/upload_file">
-      <input type=file name=file id=fileInput onchange="checkFile()">
+    <form id="fileUploadForm" method=post enctype=multipart/form-data action="/{{ username }}/upload_file">
+      <input type=file name=file id=fileInput multiple onchange="checkFile()">
       <input type=submit value=Upload id=uploadButton disabled class="disabled-upload-button">
+      <progress id="uploadProgress" value="0" max="100" style="display:none;width:100%;"></progress>
     </form>
+    <h2>Drag &amp; Drop Upload</h2>
+    <div id="dropArea" class="drop-area">Drag files here</div>
     <h2>Upload Folder</h2>
-    <form method=post enctype=multipart/form-data action="/{{ username }}/upload_folder">
-      <input type=file name=file id=folderInput webkitdirectory mozdirectory onchange="checkFolder() multiple">
+    <form id="folderUploadForm" method=post enctype=multipart/form-data action="/{{ username }}/upload_folder">
+      <input type=file name=file id=folderInput webkitdirectory mozdirectory multiple onchange="checkFolder()">
       <input type=submit value="Upload Folder" id=uploadFolderButton disabled class="disabled-upload-button">
+      <progress id="folderUploadProgress" value="0" max="100" style="display:none;width:100%;"></progress>
     </form>
     <h1>Download Files</h1>
-    <table>
+    <form id="batchDownloadForm" method=post action="/{{ username }}/download_batch">
+    <table id="fileTable">
       <tr>
         <th>Filename</th>
         <th>Upload Time</th>
@@ -181,14 +234,16 @@ def index(username):
         <th>Actions</th>
       </tr>
       {% for filename, meta in files.items() %}
-      <tr>
+      <tr data-filename="{{ filename }}" onclick="toggleRowSelection(event, this)">
         <td>{{ filename }}</td>
         <td>{{ meta['upload_time'] }}</td>
         <td>{{ meta['upload_ip'] }}</td>
-        <td><a href="/{{ username }}/download/{{ filename }}">Download</a> - <a href="#" onclick="confirmDeletion('{{ filename }}')">Delete</a></td>
+        <td><a href="/{{ username }}/download/{{ filename }}">Download</a> - <a href="#" onclick="confirmDeletion('{{ filename }}')">Delete</a> - <a href="/{{ username }}/history/{{ filename }}">History</a></td>
       </tr>
       {% endfor %}
     </table>
+    <input type=submit value="Download Selected" id="downloadSelectedButton" disabled class="disabled-upload-button">
+    </form>
     <form method=post action="/{{ username }}/clear">
       <input type=submit value="Clear All Files" onclick="return confirm('Are you sure you want to delete all files?');">
     </form>
@@ -323,35 +378,170 @@ function showCopyMessage(message) {
         currentUrl.searchParams.set('reverse_comments', reverseComments === 'true' ? 'false' : 'true');
         window.location.href = currentUrl.toString();
       }
+
+      const selectedFiles = new Set();
+
+      function toggleRowSelection(event, row) {
+        if (event.target.tagName.toLowerCase() === 'a' || event.target.tagName.toLowerCase() === 'button') {
+          return;
+        }
+        const fname = row.dataset.filename;
+        if (selectedFiles.has(fname)) {
+          selectedFiles.delete(fname);
+          row.classList.remove('selected-row');
+        } else {
+          selectedFiles.add(fname);
+          row.classList.add('selected-row');
+        }
+        updateDownloadButton();
+      }
+
+      function updateHiddenInputs() {
+        const form = document.getElementById('batchDownloadForm');
+        form.querySelectorAll('input[name="files"]').forEach(el => el.remove());
+        selectedFiles.forEach(f => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'files';
+          input.value = f;
+          form.appendChild(input);
+        });
+      }
+
+      function updateDownloadButton() {
+        const btn = document.getElementById('downloadSelectedButton');
+        const has = selectedFiles.size > 0;
+        btn.disabled = !has;
+        if (has) {
+          btn.classList.remove('disabled-upload-button');
+        } else {
+          btn.classList.add('disabled-upload-button');
+        }
+        updateHiddenInputs();
+      }
+
+      const username = "{{ username }}";
+
+      function uploadFiles(files) {
+        if (files.length === 0) return;
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('file', file);
+        }
+        const progress = document.getElementById('uploadProgress');
+        progress.value = 0;
+        progress.style.display = 'block';
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/${username}/upload_file`);
+        xhr.upload.onprogress = function(event) {
+          if (event.lengthComputable) {
+            progress.value = (event.loaded / event.total) * 100;
+          }
+        };
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            window.location.href = `/${username}/?message=File upload completed successfully!`;
+          } else {
+            alert('Upload failed');
+          }
+        };
+        xhr.send(formData);
+      }
+
+      document.getElementById('fileUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        uploadFiles(document.getElementById('fileInput').files);
+      });
+
+      const dropArea = document.getElementById('dropArea');
+      dropArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropArea.classList.add('dragover');
+      });
+      dropArea.addEventListener('dragleave', function() {
+        dropArea.classList.remove('dragover');
+      });
+      function uploadFolder(files) {
+        if (files.length === 0) return;
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('file', file);
+        }
+        const progress = document.getElementById('folderUploadProgress');
+        progress.style.display = 'block';
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/${username}/upload_folder`);
+        xhr.upload.onprogress = function(event) {
+          if (event.lengthComputable) {
+            progress.value = (event.loaded / event.total) * 100;
+          }
+        };
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            window.location.href = `/${username}/?message=Folder upload completed successfully!`;
+          } else {
+            alert('Upload failed');
+          }
+        };
+        xhr.send(formData);
+      }
+      dropArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropArea.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        let hasFolder = false;
+        for (const f of files) {
+          if (f.webkitRelativePath && f.webkitRelativePath.includes('/')) {
+            hasFolder = true;
+            break;
+          }
+        }
+        if (hasFolder) {
+          uploadFolder(files);
+        } else {
+          uploadFiles(files);
+        }
+      });
+
+      document.getElementById('folderUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const files = document.getElementById('folderInput').files;
+        uploadFolder(files);
+      });
+      updateDownloadButton();
     </script>
     {% if message %}
     <script>alert("{{ message }}");</script>
     {% endif %}
     </body>
     </html>
-    ''', files=metadata, comments=comments, username=username)
+    ''', files=files, comments=comments, username=username)
 
 @app.route('/<username>/upload_file', methods=['POST'])
 def upload_file(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
     os.makedirs(upload_folder, exist_ok=True)
-    meta_file = os.path.join(upload_folder, META_FILE_NAME)
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    os.makedirs(meta_folder, exist_ok=True)
+    meta_file = os.path.join(meta_folder, META_FILE_NAME)
+    os.makedirs(os.path.join(upload_folder, VERSIONS_FOLDER_NAME), exist_ok=True)
     
     if 'file' not in request.files:
+        log_action(request.remote_addr, f"upload_file missing file part for {username}")
         return 'No file part'
     
     files = request.files.getlist('file')
     if len(files) == 0 or files[0].filename == '':
+        log_action(request.remote_addr, f"upload_file no selected file for {username}")
         return 'No selected file'
     
     for file in files:
         filename = file.filename
         file_path = os.path.join(upload_folder, filename)
         if os.path.exists(file_path):
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"{os.path.splitext(filename)[0]}_{timestamp}{os.path.splitext(filename)[1]}"
-            file_path = os.path.join(upload_folder, filename)
+            archive_file(upload_folder, filename)
         file.save(file_path)
+        log_action(request.remote_addr, f"uploaded {filename} for {username}")
         
         # Load metadata
         if os.path.exists(meta_file):
@@ -374,13 +564,18 @@ def upload_file(username):
 def upload_folder(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
     os.makedirs(upload_folder, exist_ok=True)
-    meta_file = os.path.join(upload_folder, META_FILE_NAME)
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    os.makedirs(meta_folder, exist_ok=True)
+    meta_file = os.path.join(meta_folder, META_FILE_NAME)
+    os.makedirs(os.path.join(upload_folder, VERSIONS_FOLDER_NAME), exist_ok=True)
     
     if 'file' not in request.files:
+        log_action(request.remote_addr, f"upload_folder missing file part for {username}")
         return 'No file part'
     
     files = request.files.getlist('file')
     if len(files) == 0 or files[0].filename == '':
+        log_action(request.remote_addr, f"upload_folder no selected folder for {username}")
         return 'No selected folder'
     
     temp_folder = os.path.join(TEMP_UPLOAD_FOLDER, username)
@@ -396,7 +591,10 @@ def upload_folder(username):
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     zip_filename = f"{original_folder_name}_{timestamp}.zip"
     zip_filepath = os.path.join(upload_folder, zip_filename)
+    if os.path.exists(zip_filepath):
+        archive_file(upload_folder, zip_filename)
     shutil.make_archive(zip_filepath[:-4], 'zip', temp_folder)
+    log_action(request.remote_addr, f"uploaded folder {zip_filename} for {username}")
 
     # Remove the temporary files
     shutil.rmtree(temp_folder)
@@ -421,16 +619,74 @@ def upload_folder(username):
 @app.route('/<username>/download/<filename>')
 def download_file(username, filename):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
+    log_action(request.remote_addr, f"downloaded {filename} for {username}")
     return send_from_directory(upload_folder, filename)
+
+@app.route('/<username>/download_batch', methods=['POST'])
+def download_batch(username):
+    upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
+    selected_files = request.form.getlist('files')
+    if not selected_files:
+        log_action(request.remote_addr, f"download_batch with no selection for {username}")
+        return f'<script>window.location.href = "/{username}/?message=No files selected!";</script>'
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, 'w') as zf:
+        for fname in selected_files:
+            file_path = os.path.join(upload_folder, fname)
+            if os.path.isfile(file_path):
+                zf.write(file_path, arcname=fname)
+    mem.seek(0)
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_action(request.remote_addr, f"downloaded batch {selected_files} for {username}")
+    return send_file(mem, download_name=f'selected_{timestamp}.zip', as_attachment=True, mimetype='application/zip')
+
+@app.route('/<username>/history/<filename>')
+def file_history(username, filename):
+    upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
+    versions_dir = os.path.join(upload_folder, VERSIONS_FOLDER_NAME, filename)
+    if not os.path.isdir(versions_dir):
+        return f'<script>window.location.href = "/{username}/?message=No history for {filename}!";</script>'
+    versions = sorted(os.listdir(versions_dir), reverse=True)
+    items = ''.join(f'<li>{v} - <a href="/{username}/restore/{filename}/{v}">Restore</a></li>' for v in versions)
+    return f'<h1>History for {filename}</h1><ul>{items}</ul><a href="/{username}/">Back</a>'
+
+@app.route('/<username>/restore/<filename>/<version>')
+def restore_version(username, filename, version):
+    upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
+    versions_dir = os.path.join(upload_folder, VERSIONS_FOLDER_NAME, filename)
+    version_path = os.path.join(versions_dir, version)
+    if not os.path.exists(version_path):
+        log_action(request.remote_addr, f"attempted restore of missing {filename} {version} for {username}")
+        return f'<script>window.location.href = "/{username}/?message=Version not found!";</script>'
+    if os.path.exists(os.path.join(upload_folder, filename)):
+        archive_file(upload_folder, filename)
+    shutil.move(version_path, os.path.join(upload_folder, filename))
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    os.makedirs(meta_folder, exist_ok=True)
+    meta_file = os.path.join(meta_folder, META_FILE_NAME)
+    metadata = {}
+    if os.path.exists(meta_file):
+        with open(meta_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+    metadata[filename] = {
+        'upload_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
+        'upload_ip': request.remote_addr
+    }
+    with open(meta_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=4)
+    log_action(request.remote_addr, f"restored {filename} version {version} for {username}")
+    return f'<script>window.location.href = "/{username}/?message=File restored successfully!";</script>'
 
 @app.route('/<username>/delete/<filename>', methods=['GET'])
 def delete_file(username, filename):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
-    meta_file = os.path.join(upload_folder, META_FILE_NAME)
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    meta_file = os.path.join(meta_folder, META_FILE_NAME)
     file_path = os.path.join(upload_folder, filename)
-    
+
     if os.path.exists(file_path):
-        os.remove(file_path)
+        archive_file(upload_folder, filename)
         # Remove metadata
         if os.path.exists(meta_file):
             with open(meta_file, 'r',encoding='utf-8') as f:
@@ -439,34 +695,43 @@ def delete_file(username, filename):
                 del metadata[filename]
                 with open(meta_file, 'w',encoding='utf-8') as f:
                     json.dump(metadata, f, ensure_ascii=False, indent=4)
+        log_action(request.remote_addr, f"deleted {filename} for {username}")
         return f'<script>window.location.href = "/{username}/?message=File deleted successfully!";</script>'
     else:
+        log_action(request.remote_addr, f"attempted delete of missing {filename} for {username}")
         return f'<script>window.location.href = "/{username}/?message=File not found!";</script>'
 
 @app.route('/<username>/clear', methods=['POST'])
 def clear_files(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
-    meta_file = os.path.join(upload_folder, META_FILE_NAME)
-    
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    meta_file = os.path.join(meta_folder, META_FILE_NAME)
+
     # Delete all files in the folder
     for filename in os.listdir(upload_folder):
+        if filename in (META_FOLDER_NAME, VERSIONS_FOLDER_NAME):
+            continue
         file_path = os.path.join(upload_folder, filename)
         if os.path.isfile(file_path):
-            os.remove(file_path)
+            archive_file(upload_folder, filename)
     
     # Clear metadata
     if os.path.exists(meta_file):
         os.remove(meta_file)
     
+    log_action(request.remote_addr, f"cleared all files for {username}")
     return f'<script>window.location.href = "/{username}/?message=All files deleted successfully!";</script>'
 
 @app.route('/<username>/comment', methods=['POST'])
 def add_comment(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
-    comments_file = os.path.join(upload_folder, COMMENTS_FILE_NAME)
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    os.makedirs(meta_folder, exist_ok=True)
+    comments_file = os.path.join(meta_folder, COMMENTS_FILE_NAME)
     
     comment_text = request.form.get('comment')
     if not comment_text:
+        log_action(request.remote_addr, f"attempted empty comment for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment cannot be empty!";</script>'
     
     # Load comments
@@ -487,13 +752,15 @@ def add_comment(username):
     # Save comments
     with open(comments_file, 'w',encoding='utf-8') as f:
         json.dump(comments, f, indent=4, ensure_ascii=False)
+    log_action(request.remote_addr, f"added comment for {username}")
     
     return f'<script>window.location.href = "/{username}/?message=Comment added successfully!";</script>'
 
 @app.route('/<username>/delete_comment/<int:comment_index>', methods=['GET'])
 def delete_comment(username, comment_index):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
-    comments_file = os.path.join(upload_folder, COMMENTS_FILE_NAME)
+    meta_folder = os.path.join(upload_folder, META_FOLDER_NAME)
+    comments_file = os.path.join(meta_folder, COMMENTS_FILE_NAME)
     
     # Load comments
     if os.path.exists(comments_file):
@@ -507,8 +774,10 @@ def delete_comment(username, comment_index):
         del comments[comment_index]
         with open(comments_file, 'w',encoding='utf-8') as f:
             json.dump(comments, f, indent=4, ensure_ascii=False)
+        log_action(request.remote_addr, f"deleted comment {comment_index} for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment deleted successfully!";</script>'
     else:
+        log_action(request.remote_addr, f"attempted delete of missing comment {comment_index} for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment not found!";</script>'
 
 if __name__ == '__main__':
