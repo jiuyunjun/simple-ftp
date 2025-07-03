@@ -431,11 +431,13 @@ function showCopyMessage(message) {
         const progress = document.getElementById('uploadProgress');
         progress.value = 0;
         progress.style.display = 'block';
+        const totalSize = Array.from(files).reduce((sum, f) => sum + f.size, 0);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/${username}/upload_file`);
         xhr.upload.onprogress = function(event) {
-          if (event.lengthComputable) {
-            progress.value = (event.loaded / event.total) * 100;
+          const total = event.lengthComputable && event.total ? event.total : totalSize;
+          if (total) {
+            progress.value = (event.loaded / total) * 100;
           }
         };
         xhr.onload = function() {
@@ -468,12 +470,15 @@ function showCopyMessage(message) {
           formData.append('file', file);
         }
         const progress = document.getElementById('folderUploadProgress');
+        progress.value = 0;
         progress.style.display = 'block';
+        const totalSize = Array.from(files).reduce((sum, f) => sum + f.size, 0);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/${username}/upload_folder`);
         xhr.upload.onprogress = function(event) {
-          if (event.lengthComputable) {
-            progress.value = (event.loaded / event.total) * 100;
+          const total = event.lengthComputable && event.total ? event.total : totalSize;
+          if (total) {
+            progress.value = (event.loaded / total) * 100;
           }
         };
         xhr.onload = function() {
