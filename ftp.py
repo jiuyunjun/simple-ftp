@@ -163,14 +163,16 @@ def index(username):
     <body>
     <h1>Upload a File or Folder</h1>
     <h2>Upload Individual File</h2>
-    <form method=post enctype=multipart/form-data action="/{{ username }}/upload_file">
-      <input type=file name=file id=fileInput onchange="checkFile()">
+    <form id="fileUploadForm" method=post enctype=multipart/form-data action="/{{ username }}/upload_file">
+      <input type=file name=file id=fileInput multiple onchange="checkFile()">
       <input type=submit value=Upload id=uploadButton disabled class="disabled-upload-button">
+      <progress id="uploadProgress" value="0" max="100" style="display:none;width:100%;"></progress>
     </form>
     <h2>Upload Folder</h2>
-    <form method=post enctype=multipart/form-data action="/{{ username }}/upload_folder">
-      <input type=file name=file id=folderInput webkitdirectory mozdirectory onchange="checkFolder() multiple">
+    <form id="folderUploadForm" method=post enctype=multipart/form-data action="/{{ username }}/upload_folder">
+      <input type=file name=file id=folderInput webkitdirectory mozdirectory multiple onchange="checkFolder()">
       <input type=submit value="Upload Folder" id=uploadFolderButton disabled class="disabled-upload-button">
+      <progress id="folderUploadProgress" value="0" max="100" style="display:none;width:100%;"></progress>
     </form>
     <h1>Download Files</h1>
     <table>
@@ -323,6 +325,61 @@ function showCopyMessage(message) {
         currentUrl.searchParams.set('reverse_comments', reverseComments === 'true' ? 'false' : 'true');
         window.location.href = currentUrl.toString();
       }
+
+      const username = "{{ username }}";
+      document.getElementById('fileUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const files = document.getElementById('fileInput').files;
+        if (files.length === 0) return;
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('file', file);
+        }
+        const progress = document.getElementById('uploadProgress');
+        progress.style.display = 'block';
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/${username}/upload_file`);
+        xhr.upload.onprogress = function(event) {
+          if (event.lengthComputable) {
+            progress.value = (event.loaded / event.total) * 100;
+          }
+        };
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            window.location.href = `/${username}/?message=File upload completed successfully!`;
+          } else {
+            alert('Upload failed');
+          }
+        };
+        xhr.send(formData);
+      });
+
+      document.getElementById('folderUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const files = document.getElementById('folderInput').files;
+        if (files.length === 0) return;
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('file', file);
+        }
+        const progress = document.getElementById('folderUploadProgress');
+        progress.style.display = 'block';
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/${username}/upload_folder`);
+        xhr.upload.onprogress = function(event) {
+          if (event.lengthComputable) {
+            progress.value = (event.loaded / event.total) * 100;
+          }
+        };
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            window.location.href = `/${username}/?message=Folder upload completed successfully!`;
+          } else {
+            alert('Upload failed');
+          }
+        };
+        xhr.send(formData);
+      });
     </script>
     {% if message %}
     <script>alert("{{ message }}");</script>
