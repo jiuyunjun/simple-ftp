@@ -6,6 +6,7 @@ import random
 import shutil
 import zipfile
 import io
+import logging
 
 app = Flask(__name__)
 BASE_UPLOAD_FOLDER = 'uploads'
@@ -15,6 +16,14 @@ os.makedirs(BASE_UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(TEMP_UPLOAD_FOLDER, exist_ok=True)
 META_FILE_NAME = 'metadata.json'
 COMMENTS_FILE_NAME = 'comments.json'
+LOG_FILE = 'server.log'
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(message)s',
+    filename=LOG_FILE,
+    encoding='utf-8'
+)
 
 # Load global metadata if exists
 if os.path.exists(GLOBAL_META_FILE):
@@ -39,6 +48,10 @@ def get_text_color(hex_color):
 
 app.jinja_env.globals.update(get_text_color=get_text_color)
 
+def log_action(ip, action):
+    """Record an action performed by an IP."""
+    logging.info(f"{ip} {action}")
+
 @app.route('/<username>/')
 def index(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
@@ -59,6 +72,8 @@ def index(username):
             comments = json.load(f)
     else:
         comments = []
+
+    log_action(request.remote_addr, f"view index for {username}")
 
     reverse_comments = request.args.get('reverse_comments', 'false').lower() == 'true'
     if reverse_comments:
@@ -477,10 +492,12 @@ def upload_file(username):
     meta_file = os.path.join(upload_folder, META_FILE_NAME)
     
     if 'file' not in request.files:
+        log_action(request.remote_addr, f"upload_file missing file part for {username}")
         return 'No file part'
     
     files = request.files.getlist('file')
     if len(files) == 0 or files[0].filename == '':
+        log_action(request.remote_addr, f"upload_file no selected file for {username}")
         return 'No selected file'
     
     for file in files:
@@ -491,6 +508,7 @@ def upload_file(username):
             filename = f"{os.path.splitext(filename)[0]}_{timestamp}{os.path.splitext(filename)[1]}"
             file_path = os.path.join(upload_folder, filename)
         file.save(file_path)
+        log_action(request.remote_addr, f"uploaded {filename} for {username}")
         
         # Load metadata
         if os.path.exists(meta_file):
@@ -516,10 +534,12 @@ def upload_folder(username):
     meta_file = os.path.join(upload_folder, META_FILE_NAME)
     
     if 'file' not in request.files:
+        log_action(request.remote_addr, f"upload_folder missing file part for {username}")
         return 'No file part'
     
     files = request.files.getlist('file')
     if len(files) == 0 or files[0].filename == '':
+        log_action(request.remote_addr, f"upload_folder no selected folder for {username}")
         return 'No selected folder'
     
     temp_folder = os.path.join(TEMP_UPLOAD_FOLDER, username)
@@ -536,6 +556,7 @@ def upload_folder(username):
     zip_filename = f"{original_folder_name}_{timestamp}.zip"
     zip_filepath = os.path.join(upload_folder, zip_filename)
     shutil.make_archive(zip_filepath[:-4], 'zip', temp_folder)
+    log_action(request.remote_addr, f"uploaded folder {zip_filename} for {username}")
 
     # Remove the temporary files
     shutil.rmtree(temp_folder)
@@ -560,6 +581,7 @@ def upload_folder(username):
 @app.route('/<username>/download/<filename>')
 def download_file(username, filename):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
+    log_action(request.remote_addr, f"downloaded {filename} for {username}")
     return send_from_directory(upload_folder, filename)
 
 @app.route('/<username>/download_batch', methods=['POST'])
@@ -567,6 +589,7 @@ def download_batch(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
     selected_files = request.form.getlist('files')
     if not selected_files:
+        log_action(request.remote_addr, f"download_batch with no selection for {username}")
         return f'<script>window.location.href = "/{username}/?message=No files selected!";</script>'
 
     mem = io.BytesIO()
@@ -577,6 +600,7 @@ def download_batch(username):
                 zf.write(file_path, arcname=fname)
     mem.seek(0)
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_action(request.remote_addr, f"downloaded batch {selected_files} for {username}")
     return send_file(mem, download_name=f'selected_{timestamp}.zip', as_attachment=True, mimetype='application/zip')
 
 @app.route('/<username>/delete/<filename>', methods=['GET'])
@@ -595,8 +619,10 @@ def delete_file(username, filename):
                 del metadata[filename]
                 with open(meta_file, 'w',encoding='utf-8') as f:
                     json.dump(metadata, f, ensure_ascii=False, indent=4)
+        log_action(request.remote_addr, f"deleted {filename} for {username}")
         return f'<script>window.location.href = "/{username}/?message=File deleted successfully!";</script>'
     else:
+        log_action(request.remote_addr, f"attempted delete of missing {filename} for {username}")
         return f'<script>window.location.href = "/{username}/?message=File not found!";</script>'
 
 @app.route('/<username>/clear', methods=['POST'])
@@ -614,6 +640,7 @@ def clear_files(username):
     if os.path.exists(meta_file):
         os.remove(meta_file)
     
+    log_action(request.remote_addr, f"cleared all files for {username}")
     return f'<script>window.location.href = "/{username}/?message=All files deleted successfully!";</script>'
 
 @app.route('/<username>/comment', methods=['POST'])
@@ -623,6 +650,7 @@ def add_comment(username):
     
     comment_text = request.form.get('comment')
     if not comment_text:
+        log_action(request.remote_addr, f"attempted empty comment for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment cannot be empty!";</script>'
     
     # Load comments
@@ -643,6 +671,7 @@ def add_comment(username):
     # Save comments
     with open(comments_file, 'w',encoding='utf-8') as f:
         json.dump(comments, f, indent=4, ensure_ascii=False)
+    log_action(request.remote_addr, f"added comment for {username}")
     
     return f'<script>window.location.href = "/{username}/?message=Comment added successfully!";</script>'
 
@@ -663,8 +692,10 @@ def delete_comment(username, comment_index):
         del comments[comment_index]
         with open(comments_file, 'w',encoding='utf-8') as f:
             json.dump(comments, f, indent=4, ensure_ascii=False)
+        log_action(request.remote_addr, f"deleted comment {comment_index} for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment deleted successfully!";</script>'
     else:
+        log_action(request.remote_addr, f"attempted delete of missing comment {comment_index} for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment not found!";</script>'
 
 if __name__ == '__main__':

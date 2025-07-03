@@ -10,6 +10,7 @@ Simple web-based file sharing built with Flask.
 - Download and delete uploaded files
 - Batch download selected files by clicking rows to select
 - Comment board with colored messages
+- Server logs record what each IP does
 
 ### Usage
 1. Install Flask if needed: `pip install flask`
@@ -26,6 +27,7 @@ Simple web-based file sharing built with Flask.
 - 可下载或删除已上传的文件
 - 支持点击行选择并批量下载
 - 内置留言板并为不同 IP 分配颜色
+- 记录各个 IP 的操作日志
 
 ### 使用方法
 1. 如有需要安装 Flask：`pip install flask`
@@ -42,6 +44,7 @@ Flask で作られたシンプルなファイル共有ツールです。
 - アップロードしたファイルのダウンロードと削除
 - 行をクリックして複数のファイルをまとめてダウンロード
 - IP ごとに色が変わる掲示板
+- 各 IP の操作履歴を記録
 
 ### 使い方
 1. Flask が入っていない場合 `pip install flask`
