@@ -1,10 +1,11 @@
-from flask import Flask, request, send_from_directory, render_template_string
+from flask import Flask, request, send_from_directory, render_template_string, send_file
 import os
 import datetime
 import json
 import random
 import shutil
 import zipfile
+import io
 
 app = Flask(__name__)
 BASE_UPLOAD_FOLDER = 'uploads'
@@ -189,8 +190,10 @@ def index(username):
       <progress id="folderUploadProgress" value="0" max="100" style="display:none;width:100%;"></progress>
     </form>
     <h1>Download Files</h1>
+    <form id="batchDownloadForm" method=post action="/{{ username }}/download_batch">
     <table>
       <tr>
+        <th>Select</th>
         <th>Filename</th>
         <th>Upload Time</th>
         <th>Upload IP</th>
@@ -198,6 +201,7 @@ def index(username):
       </tr>
       {% for filename, meta in files.items() %}
       <tr>
+        <td><input type="checkbox" name="files" value="{{ filename }}" onchange="updateDownloadButton()"></td>
         <td>{{ filename }}</td>
         <td>{{ meta['upload_time'] }}</td>
         <td>{{ meta['upload_ip'] }}</td>
@@ -205,6 +209,8 @@ def index(username):
       </tr>
       {% endfor %}
     </table>
+    <input type=submit value="Download Selected" id="downloadSelectedButton" disabled class="disabled-upload-button">
+    </form>
     <form method=post action="/{{ username }}/clear">
       <input type=submit value="Clear All Files" onclick="return confirm('Are you sure you want to delete all files?');">
     </form>
@@ -340,6 +346,17 @@ function showCopyMessage(message) {
         window.location.href = currentUrl.toString();
       }
 
+      function updateDownloadButton() {
+        const anyChecked = document.querySelectorAll('input[name="files"]:checked').length > 0;
+        const btn = document.getElementById('downloadSelectedButton');
+        btn.disabled = !anyChecked;
+        if (anyChecked) {
+          btn.classList.remove('disabled-upload-button');
+        } else {
+          btn.classList.add('disabled-upload-button');
+        }
+      }
+
       const username = "{{ username }}";
 
       function uploadFiles(files) {
@@ -413,6 +430,7 @@ function showCopyMessage(message) {
         };
         xhr.send(formData);
       });
+      updateDownloadButton();
     </script>
     {% if message %}
     <script>alert("{{ message }}");</script>
@@ -512,6 +530,23 @@ def upload_folder(username):
 def download_file(username, filename):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
     return send_from_directory(upload_folder, filename)
+
+@app.route('/<username>/download_batch', methods=['POST'])
+def download_batch(username):
+    upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
+    selected_files = request.form.getlist('files')
+    if not selected_files:
+        return f'<script>window.location.href = "/{username}/?message=No files selected!";</script>'
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, 'w') as zf:
+        for fname in selected_files:
+            file_path = os.path.join(upload_folder, fname)
+            if os.path.isfile(file_path):
+                zf.write(file_path, arcname=fname)
+    mem.seek(0)
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    return send_file(mem, download_name=f'selected_{timestamp}.zip', as_attachment=True, mimetype='application/zip')
 
 @app.route('/<username>/delete/<filename>', methods=['GET'])
 def delete_file(username, filename):
