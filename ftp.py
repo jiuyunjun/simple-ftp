@@ -422,6 +422,25 @@ function showCopyMessage(message) {
 
       const username = "{{ username }}";
 
+      function hasDroppedFolder(files, items) {
+        if (items) {
+          for (const item of items) {
+            try {
+              const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+              if (entry && entry.isDirectory) {
+                return true;
+              }
+            } catch (e) {}
+          }
+        }
+        for (const file of files) {
+          if (file.webkitRelativePath && file.webkitRelativePath.includes('/')) {
+            return true;
+          }
+        }
+        return files.length === 1 && files[0].size === 0 && !files[0].type;
+      }
+
       function uploadFiles(files) {
         if (files.length === 0) return;
         const formData = new FormData();
@@ -495,22 +514,7 @@ function showCopyMessage(message) {
         dropArea.classList.remove('dragover');
         const files = e.dataTransfer.files;
         const items = e.dataTransfer.items;
-        let hasFolder = false;
-        for (const item of items) {
-          if (item.webkitGetAsEntry && item.webkitGetAsEntry().isDirectory) {
-            hasFolder = true;
-            break;
-          }
-        }
-        if (!hasFolder) {
-          for (const f of files) {
-            if (f.webkitRelativePath && f.webkitRelativePath.includes('/')) {
-              hasFolder = true;
-              break;
-            }
-          }
-        }
-        if (hasFolder) {
+        if (hasDroppedFolder(files, items)) {
           uploadFolder(files);
         } else {
           uploadFiles(files);
