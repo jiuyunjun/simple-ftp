@@ -158,6 +158,18 @@ def index(username):
         .file-actions a:hover {
           text-decoration: underline;
         }
+        .drop-area {
+          border: 2px dashed #007bff;
+          padding: 20px;
+          text-align: center;
+          margin-bottom: 10px;
+          color: #666;
+        }
+        .drop-area.dragover {
+          background-color: #e6f7ff;
+          border-color: #1890ff;
+          color: #000;
+        }
       </style>
     </head>
     <body>
@@ -168,6 +180,8 @@ def index(username):
       <input type=submit value=Upload id=uploadButton disabled class="disabled-upload-button">
       <progress id="uploadProgress" value="0" max="100" style="display:none;width:100%;"></progress>
     </form>
+    <h2>Drag &amp; Drop Upload</h2>
+    <div id="dropArea" class="drop-area">Drag files here</div>
     <h2>Upload Folder</h2>
     <form id="folderUploadForm" method=post enctype=multipart/form-data action="/{{ username }}/upload_folder">
       <input type=file name=file id=folderInput webkitdirectory mozdirectory multiple onchange="checkFolder()">
@@ -327,15 +341,15 @@ function showCopyMessage(message) {
       }
 
       const username = "{{ username }}";
-      document.getElementById('fileUploadForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const files = document.getElementById('fileInput').files;
+
+      function uploadFiles(files) {
         if (files.length === 0) return;
         const formData = new FormData();
         for (const file of files) {
           formData.append('file', file);
         }
         const progress = document.getElementById('uploadProgress');
+        progress.value = 0;
         progress.style.display = 'block';
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/${username}/upload_file`);
@@ -352,6 +366,25 @@ function showCopyMessage(message) {
           }
         };
         xhr.send(formData);
+      }
+
+      document.getElementById('fileUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        uploadFiles(document.getElementById('fileInput').files);
+      });
+
+      const dropArea = document.getElementById('dropArea');
+      dropArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropArea.classList.add('dragover');
+      });
+      dropArea.addEventListener('dragleave', function() {
+        dropArea.classList.remove('dragover');
+      });
+      dropArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropArea.classList.remove('dragover');
+        uploadFiles(e.dataTransfer.files);
       });
 
       document.getElementById('folderUploadForm').addEventListener('submit', function(e) {
