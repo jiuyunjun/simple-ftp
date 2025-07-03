@@ -171,6 +171,9 @@ def index(username):
           border-color: #1890ff;
           color: #000;
         }
+        .selected-row {
+          background-color: #d0e8ff;
+        }
       </style>
     </head>
     <body>
@@ -191,17 +194,15 @@ def index(username):
     </form>
     <h1>Download Files</h1>
     <form id="batchDownloadForm" method=post action="/{{ username }}/download_batch">
-    <table>
+    <table id="fileTable">
       <tr>
-        <th>Select</th>
         <th>Filename</th>
         <th>Upload Time</th>
         <th>Upload IP</th>
         <th>Actions</th>
       </tr>
       {% for filename, meta in files.items() %}
-      <tr>
-        <td><input type="checkbox" name="files" value="{{ filename }}" onchange="updateDownloadButton()"></td>
+      <tr data-filename="{{ filename }}" onclick="toggleRowSelection(event, this)">
         <td>{{ filename }}</td>
         <td>{{ meta['upload_time'] }}</td>
         <td>{{ meta['upload_ip'] }}</td>
@@ -346,15 +347,45 @@ function showCopyMessage(message) {
         window.location.href = currentUrl.toString();
       }
 
+      const selectedFiles = new Set();
+
+      function toggleRowSelection(event, row) {
+        if (event.target.tagName.toLowerCase() === 'a' || event.target.tagName.toLowerCase() === 'button') {
+          return;
+        }
+        const fname = row.dataset.filename;
+        if (selectedFiles.has(fname)) {
+          selectedFiles.delete(fname);
+          row.classList.remove('selected-row');
+        } else {
+          selectedFiles.add(fname);
+          row.classList.add('selected-row');
+        }
+        updateDownloadButton();
+      }
+
+      function updateHiddenInputs() {
+        const form = document.getElementById('batchDownloadForm');
+        form.querySelectorAll('input[name="files"]').forEach(el => el.remove());
+        selectedFiles.forEach(f => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'files';
+          input.value = f;
+          form.appendChild(input);
+        });
+      }
+
       function updateDownloadButton() {
-        const anyChecked = document.querySelectorAll('input[name="files"]:checked').length > 0;
         const btn = document.getElementById('downloadSelectedButton');
-        btn.disabled = !anyChecked;
-        if (anyChecked) {
+        const has = selectedFiles.size > 0;
+        btn.disabled = !has;
+        if (has) {
           btn.classList.remove('disabled-upload-button');
         } else {
           btn.classList.add('disabled-upload-button');
         }
+        updateHiddenInputs();
       }
 
       const username = "{{ username }}";

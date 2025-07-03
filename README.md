@@ -8,7 +8,7 @@ Simple web-based file sharing built with Flask.
 - Drag-and-drop area for quick upload
 - Upload folders as ZIP archives
 - Download and delete uploaded files
-- Batch download selected files
+- Batch download selected files by clicking rows to select
 - Comment board with colored messages
 
 ### Usage
@@ -24,7 +24,7 @@ Simple web-based file sharing built with Flask.
 - 提供拖拽区域快速上传
 - 文件夹上传会自动压缩成 ZIP
 - 可下载或删除已上传的文件
-- 支持多选批量下载
+- 支持点击行选择并批量下载
 - 内置留言板并为不同 IP 分配颜色
 
 ### 使用方法
@@ -40,7 +40,7 @@ Flask で作られたシンプルなファイル共有ツールです。
 - ドラッグ&ドロップ用エリア
 - フォルダを ZIP としてアップロード
 - アップロードしたファイルのダウンロードと削除
-- 選択したファイルを一括ダウンロード
+- 行をクリックして複数のファイルをまとめてダウンロード
 - IP ごとに色が変わる掲示板
 
 ### 使い方
