@@ -494,11 +494,20 @@ function showCopyMessage(message) {
         e.preventDefault();
         dropArea.classList.remove('dragover');
         const files = e.dataTransfer.files;
+        const items = e.dataTransfer.items;
         let hasFolder = false;
-        for (const f of files) {
-          if (f.webkitRelativePath && f.webkitRelativePath.includes('/')) {
+        for (const item of items) {
+          if (item.webkitGetAsEntry && item.webkitGetAsEntry().isDirectory) {
             hasFolder = true;
             break;
+          }
+        }
+        if (!hasFolder) {
+          for (const f of files) {
+            if (f.webkitRelativePath && f.webkitRelativePath.includes('/')) {
+              hasFolder = true;
+              break;
+            }
           }
         }
         if (hasFolder) {
