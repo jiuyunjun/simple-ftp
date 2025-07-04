@@ -258,6 +258,7 @@ def index(username):
     <form method=post action="/{{ username }}/comment" onsubmit="return submitComment()">
       <div id="editor"></div>
       <input type="hidden" name="comment" id="commentInput">
+      <input type="hidden" name="comment_plain" id="commentPlainInput">
       <input type=submit value="Post Comment">
     </form>
     <h2>Comments</h2>
@@ -272,7 +273,7 @@ def index(username):
         {{ comment['time'] }} - {{ comment['ip'] }}: 
         <button onclick="confirmCommentDeletion('{{ loop.index }}')">Delete</button>
         -  
-        <button onclick='copyToClipboard({{ comment["text"] | tojson | safe }})'>Copy</button>
+        <button onclick='copyToClipboard({{ comment.get("plain", comment["text"]) | tojson | safe }})'>Copy</button>
         <div id="comment-{{ loop.index0 }}" style="display:block;">
             <div>{{ comment['text']|safe }}</div>
         </div>
@@ -298,11 +299,8 @@ def index(username):
       }
     </script>
     <script>
-function copyToClipboard(html) {
-  // Convert the HTML comment to plain text using the browser to keep line breaks
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
-  let plainText = tempDiv.innerText.replace(/\u00A0/g, ' ');
+function copyToClipboard(text) {
+  const plainText = text;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     // Modern approach using Clipboard API
     navigator.clipboard.writeText(plainText).then(function() {
@@ -542,6 +540,7 @@ function showCopyMessage(message) {
       var quill = new Quill('#editor', { theme: 'snow' });
       function submitComment() {
         document.getElementById('commentInput').value = quill.root.innerHTML;
+        document.getElementById('commentPlainInput').value = quill.getText();
         return true;
       }
     </script>
@@ -765,6 +764,7 @@ def add_comment(username):
     comments_file = os.path.join(meta_folder, COMMENTS_FILE_NAME)
     
     comment_text = request.form.get('comment')
+    comment_plain = request.form.get('comment_plain')
     if not comment_text:
         log_action(request.remote_addr, f"attempted empty comment for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment cannot be empty!";</script>'
@@ -781,6 +781,7 @@ def add_comment(username):
         'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'ip': request.remote_addr,
         'text': comment_text,
+        'plain': comment_plain,
         'color': get_background_color(request.remote_addr)
     })
     

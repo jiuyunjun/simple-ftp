@@ -10,7 +10,7 @@ Simple web-based file sharing built with Flask.
 - Download and delete uploaded files
 - Batch download selected files by clicking rows to select
 - Comment board with colored messages
-- Copy comment text exactly as written, preserving all line breaks while stripping HTML tags
+- Copy comment text exactly as written, preserving all line breaks
 - Server logs record what each IP does
 
 ### Usage
@@ -28,7 +28,7 @@ Simple web-based file sharing built with Flask.
 - 可下载或删除已上传的文件
 - 支持点击行选择并批量下载
 - 内置留言板并为不同 IP 分配颜色
-- 留言复制时完全保留换行并去除 HTML 标签
+- 留言复制时完全保留换行
 - 记录各个 IP 的操作日志
 
 ### 使用方法
@@ -46,7 +46,7 @@ Flask で作られたシンプルなファイル共有ツールです。
 - アップロードしたファイルのダウンロードと削除
 - 行をクリックして複数のファイルをまとめてダウンロード
 - IP ごとに色が変わる掲示板
-- コメントをコピーする際、改行を完全に保ったまま HTML タグを除去
+- コメントをコピーする際、改行を完全に保持
 - 各 IP の操作履歴を記録
 
 ### 使い方
