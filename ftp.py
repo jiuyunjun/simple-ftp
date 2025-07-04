@@ -299,10 +299,11 @@ def index(username):
     </script>
     <script>
 function copyToClipboard(text) {
-  // Strip HTML tags when copying comment text
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = text;
-  const plainText = tempDiv.textContent || tempDiv.innerText || '';
+  // Strip HTML tags when copying comment text but preserve line breaks
+  const plainText = text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
   if (navigator.clipboard && navigator.clipboard.writeText) {
     // Modern approach using Clipboard API
     navigator.clipboard.writeText(plainText).then(function() {
