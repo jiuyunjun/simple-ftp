@@ -88,6 +88,8 @@ def index(username):
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <meta charset="utf-8">
       <link rel="icon" href="{{ url_for('static', filename='favicons/favicon.ico') }}" type="image/x-icon">
+      <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+      <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
       <style>
         .disabled-upload-button {
           background-color: #e0e0e0;
@@ -133,6 +135,11 @@ def index(username):
           padding: 10px;
           border: 1px solid #ddd;
           border-radius: 5px;
+        }
+        #editor {
+          height: 150px;
+          margin-bottom: 10px;
+          background-color: #fff;
         }
         button, input[type="submit"] {
           background-color: #007bff;
@@ -231,8 +238,9 @@ def index(username):
       <input type=submit value="Clear All Files" onclick="return confirm('Are you sure you want to delete all files?');">
     </form>
     <h1>Message Board</h1>
-    <form method=post action="/{{ username }}/comment">
-      <textarea name="comment" rows="4" cols="50" placeholder="Write your message here..."></textarea><br>
+    <form method=post action="/{{ username }}/comment" onsubmit="return submitComment()">
+      <div id="editor"></div>
+      <input type="hidden" name="comment" id="commentInput">
       <input type=submit value="Post Comment">
     </form>
     <h2>Comments</h2>
@@ -249,7 +257,7 @@ def index(username):
         -  
         <button onclick='copyToClipboard({{ comment["text"] | tojson | safe }})'>Copy</button>
         <div id="comment-{{ loop.index0 }}" style="display:block;">
-            <pre>{{ comment['text'] }}</pre>
+            <div>{{ comment['text']|safe }}</div>
         </div>
         </li>
         {% endfor %}
@@ -477,6 +485,11 @@ function showCopyMessage(message) {
         xhr.send(formData);
       });
       updateDownloadButton();
+      var quill = new Quill('#editor', { theme: 'snow' });
+      function submitComment() {
+        document.getElementById('commentInput').value = quill.root.innerHTML;
+        return true;
+      }
     </script>
     {% if message %}
     <script>alert("{{ message }}");</script>
