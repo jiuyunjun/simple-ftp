@@ -300,7 +300,7 @@ def index(username):
     </script>
     <script>
 function copyToClipboard(text) {
-  const plainText = text;
+  const plainText = text.replace(/\u00A0/g, ' ');
   if (navigator.clipboard && navigator.clipboard.writeText) {
     // Modern approach using Clipboard API
     navigator.clipboard.writeText(plainText).then(function() {
@@ -540,7 +540,7 @@ function showCopyMessage(message) {
       var quill = new Quill('#editor', { theme: 'snow' });
       function submitComment() {
         document.getElementById('commentInput').value = quill.root.innerHTML;
-        document.getElementById('commentPlainInput').value = quill.getText();
+        document.getElementById('commentPlainInput').value = quill.getText().replace(/\u00A0/g, ' ');
         return true;
       }
     </script>
