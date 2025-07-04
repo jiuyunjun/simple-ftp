@@ -299,9 +299,13 @@ def index(username):
     </script>
     <script>
 function copyToClipboard(text) {
+  // Strip HTML tags when copying comment text
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = text;
+  const plainText = tempDiv.textContent || tempDiv.innerText || '';
   if (navigator.clipboard && navigator.clipboard.writeText) {
     // Modern approach using Clipboard API
-    navigator.clipboard.writeText(text).then(function() {
+    navigator.clipboard.writeText(plainText).then(function() {
       showCopyMessage('Comment copied to clipboard!');
     }).catch(function(err) {
       alert('Failed to copy comment: ' + err);
@@ -309,7 +313,7 @@ function copyToClipboard(text) {
   } else {
     // Fallback approach for older browsers
     const textArea = document.createElement('textarea');
-    textArea.value = text;
+    textArea.value = plainText;
     textArea.style.position = 'fixed'; // Avoid scrolling to bottom
     textArea.style.left = '-9999px';
     document.body.appendChild(textArea);
