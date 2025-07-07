@@ -16,7 +16,9 @@ Simple web-based file sharing built with Flask.
 ### Usage
 1. Install Flask if needed: `pip install flask`
 2. Run `python ftp.py`
-3. Open `http://localhost:5000/<username>/` in your browser to start uploading
+3. Open `http://localhost:5000/<space>/` in your browser to start uploading
+   (`<space>` represents a task space or purpose, not necessarily a personal name)
+4. Visiting `http://localhost:5000/` shows an index of all spaces
 
 ## 中文
 基于 Flask 的简单文件分享工具。
@@ -34,7 +36,9 @@ Simple web-based file sharing built with Flask.
 ### 使用方法
 1. 如有需要安装 Flask：`pip install flask`
 2. 运行 `python ftp.py`
-3. 在浏览器打开 `http://localhost:5000/<用户名>/` 开始上传
+3. 在浏览器打开 `http://localhost:5000/<空间名>/` 开始上传
+   （此处的 `<空间名>` 指一个任务空间或目的地，并非必须是个人名称）
+4. 访问 `http://localhost:5000/` 可查看全部空间索引
 
 ## 日本語
 Flask で作られたシンプルなファイル共有ツールです。
@@ -52,4 +56,6 @@ Flask で作られたシンプルなファイル共有ツールです。
 ### 使い方
 1. Flask が入っていない場合 `pip install flask`
 2. `python ftp.py` を実行
-3. ブラウザで `http://localhost:5000/<ユーザー名>/` を開いてアップロード開始
+3. ブラウザで `http://localhost:5000/<スペース>/` を開いてアップロード開始
+   （`<スペース>` は作業用や目的別のスペース名で、必ずしも個人名ではありません）
+4. `http://localhost:5000/` にアクセスするとスペース一覧が表示されます

@@ -64,6 +64,33 @@ def archive_file(upload_folder, filename):
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     shutil.move(src, os.path.join(versions_dir, f'{timestamp}_{filename}'))
 
+
+@app.route('/')
+def list_spaces():
+    """List all existing spaces as links."""
+    if os.path.exists(BASE_UPLOAD_FOLDER):
+        spaces = [d for d in os.listdir(BASE_UPLOAD_FOLDER)
+                  if os.path.isdir(os.path.join(BASE_UPLOAD_FOLDER, d))]
+    else:
+        spaces = []
+    return render_template_string('''
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Available Spaces</title>
+    </head>
+    <body>
+      <h1>Spaces</h1>
+      <ul>
+      {% for space in spaces %}
+        <li><a href="{{ url_for('index', username=space) }}">{{ space }}</a></li>
+      {% endfor %}
+      </ul>
+    </body>
+    </html>
+    ''', spaces=spaces)
+
 @app.route('/<username>/')
 def index(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
