@@ -73,6 +73,7 @@ def list_spaces():
                   if os.path.isdir(os.path.join(BASE_UPLOAD_FOLDER, d))]
     else:
         spaces = []
+    message = request.args.get('message')
     return render_template_string('''
     <!doctype html>
     <html>
@@ -98,18 +99,29 @@ def list_spaces():
     </head>
     <body>
       <h1>Spaces</h1>
+      {% if message %}<p>{{ message }}</p>{% endif %}
       <ul>
       {% if spaces %}
         {% for space in spaces %}
-          <li><a href="{{ url_for('index', username=space) }}">{{ space }}</a></li>
+          <li>
+            <a href="{{ url_for('index', username=space) }}">{{ space }}</a>
+            <form method="post" action="{{ url_for('delete_space', space=space) }}" style="display:inline;" onsubmit="return confirmDeleteSpace('{{ space }}');">
+              <button type="submit">Delete</button>
+            </form>
+          </li>
         {% endfor %}
       {% else %}
         <li>No spaces found.</li>
       {% endif %}
       </ul>
+      <script>
+        function confirmDeleteSpace(space) {
+          return confirm('Are you sure you want to delete space ' + space + '?');
+        }
+      </script>
     </body>
     </html>
-    ''', spaces=spaces)
+    ''', spaces=spaces, message=message)
 
 @app.route('/<username>/')
 def index(username):
@@ -862,6 +874,18 @@ def delete_comment(username, comment_index):
     else:
         log_action(request.remote_addr, f"attempted delete of missing comment {comment_index} for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment not found!";</script>'
+
+@app.route('/delete_space/<space>', methods=['POST'])
+def delete_space(space):
+    """Remove an entire space and its files."""
+    upload_folder = os.path.join(BASE_UPLOAD_FOLDER, space)
+    if os.path.isdir(upload_folder):
+        shutil.rmtree(upload_folder)
+        log_action(request.remote_addr, f"deleted space {space}")
+        return '<script>window.location.href = "/?message=Space deleted successfully!";</script>'
+    else:
+        log_action(request.remote_addr, f"attempted delete of missing space {space}")
+        return '<script>window.location.href = "/?message=Space not found!";</script>'
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
