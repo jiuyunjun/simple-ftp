@@ -67,7 +67,7 @@ def archive_file(upload_folder, filename):
 
 @app.route('/')
 def list_spaces():
-    """List all existing spaces as links."""
+    """Display all existing spaces with consistent styling."""
     if os.path.exists(BASE_UPLOAD_FOLDER):
         spaces = [d for d in os.listdir(BASE_UPLOAD_FOLDER)
                   if os.path.isdir(os.path.join(BASE_UPLOAD_FOLDER, d))]
@@ -79,13 +79,33 @@ def list_spaces():
     <head>
       <meta charset="utf-8">
       <title>Available Spaces</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f0f2f5;
+          color: #333;
+          padding: 20px;
+          margin: 0;
+        }
+        h1 {
+          color: #007bff;
+        }
+        ul { list-style: none; padding: 0; }
+        li { margin: 10px 0; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+      </style>
     </head>
     <body>
       <h1>Spaces</h1>
       <ul>
-      {% for space in spaces %}
-        <li><a href="{{ url_for('index', username=space) }}">{{ space }}</a></li>
-      {% endfor %}
+      {% if spaces %}
+        {% for space in spaces %}
+          <li><a href="{{ url_for('index', username=space) }}">{{ space }}</a></li>
+        {% endfor %}
+      {% else %}
+        <li>No spaces found.</li>
+      {% endif %}
       </ul>
     </body>
     </html>
