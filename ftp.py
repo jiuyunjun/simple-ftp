@@ -64,6 +64,94 @@ def archive_file(upload_folder, filename):
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     shutil.move(src, os.path.join(versions_dir, f'{timestamp}_{filename}'))
 
+
+@app.route('/')
+def list_spaces():
+    """Display all existing spaces with consistent styling."""
+    if os.path.exists(BASE_UPLOAD_FOLDER):
+        spaces = [d for d in os.listdir(BASE_UPLOAD_FOLDER)
+                  if os.path.isdir(os.path.join(BASE_UPLOAD_FOLDER, d))]
+    else:
+        spaces = []
+    message = request.args.get('message')
+    return render_template_string('''
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Available Spaces</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f0f2f5;
+          color: #333;
+          padding: 20px;
+          margin: 0;
+        }
+        h1 {
+          color: #007bff;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        table, th, td { border: 1px solid #ddd; }
+        th, td {
+          padding: 12px;
+          text-align: left;
+        }
+        th {
+          background-color: #007bff;
+          color: white;
+        }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button {
+          background-color: #007bff;
+          color: white;
+          border: none;
+          padding: 10px 15px;
+          margin: 5px 0;
+          cursor: pointer;
+          border-radius: 5px;
+          transition: background-color 0.3s;
+        }
+        button:hover {
+          background-color: #0056b3;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>Spaces</h1>
+      {% if message %}<p>{{ message }}</p>{% endif %}
+      <table>
+        <tr><th>Space</th><th>Actions</th></tr>
+        {% if spaces %}
+          {% for space in spaces %}
+            <tr>
+              <td><a href="{{ url_for('index', username=space) }}">{{ space }}</a></td>
+              <td>
+                <form method="post" action="{{ url_for('delete_space', space=space) }}" onsubmit="return confirmDeleteSpace('{{ space }}');">
+                  <button type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="2">No spaces found.</td></tr>
+        {% endif %}
+      </table>
+      <script>
+        function confirmDeleteSpace(space) {
+          return confirm('Are you sure you want to delete space ' + space + '?');
+        }
+      </script>
+    </body>
+    </html>
+    ''', spaces=spaces, message=message)
+
 @app.route('/<username>/')
 def index(username):
     upload_folder = os.path.join(BASE_UPLOAD_FOLDER, username)
@@ -815,6 +903,18 @@ def delete_comment(username, comment_index):
     else:
         log_action(request.remote_addr, f"attempted delete of missing comment {comment_index} for {username}")
         return f'<script>window.location.href = "/{username}/?message=Comment not found!";</script>'
+
+@app.route('/delete_space/<space>', methods=['POST'])
+def delete_space(space):
+    """Remove an entire space and its files."""
+    upload_folder = os.path.join(BASE_UPLOAD_FOLDER, space)
+    if os.path.isdir(upload_folder):
+        shutil.rmtree(upload_folder)
+        log_action(request.remote_addr, f"deleted space {space}")
+        return '<script>window.location.href = "/?message=Space deleted successfully!";</script>'
+    else:
+        log_action(request.remote_addr, f"attempted delete of missing space {space}")
+        return '<script>window.location.href = "/?message=Space not found!";</script>'
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
