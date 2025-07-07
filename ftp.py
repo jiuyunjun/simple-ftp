@@ -91,29 +91,58 @@ def list_spaces():
         h1 {
           color: #007bff;
         }
-        ul { list-style: none; padding: 0; }
-        li { margin: 10px 0; }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        table, th, td { border: 1px solid #ddd; }
+        th, td {
+          padding: 12px;
+          text-align: left;
+        }
+        th {
+          background-color: #007bff;
+          color: white;
+        }
         a { color: #007bff; text-decoration: none; }
         a:hover { text-decoration: underline; }
+        button {
+          background-color: #007bff;
+          color: white;
+          border: none;
+          padding: 10px 15px;
+          margin: 5px 0;
+          cursor: pointer;
+          border-radius: 5px;
+          transition: background-color 0.3s;
+        }
+        button:hover {
+          background-color: #0056b3;
+        }
       </style>
     </head>
     <body>
       <h1>Spaces</h1>
       {% if message %}<p>{{ message }}</p>{% endif %}
-      <ul>
-      {% if spaces %}
-        {% for space in spaces %}
-          <li>
-            <a href="{{ url_for('index', username=space) }}">{{ space }}</a>
-            <form method="post" action="{{ url_for('delete_space', space=space) }}" style="display:inline;" onsubmit="return confirmDeleteSpace('{{ space }}');">
-              <button type="submit">Delete</button>
-            </form>
-          </li>
-        {% endfor %}
-      {% else %}
-        <li>No spaces found.</li>
-      {% endif %}
-      </ul>
+      <table>
+        <tr><th>Space</th><th>Actions</th></tr>
+        {% if spaces %}
+          {% for space in spaces %}
+            <tr>
+              <td><a href="{{ url_for('index', username=space) }}">{{ space }}</a></td>
+              <td>
+                <form method="post" action="{{ url_for('delete_space', space=space) }}" onsubmit="return confirmDeleteSpace('{{ space }}');">
+                  <button type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="2">No spaces found.</td></tr>
+        {% endif %}
+      </table>
       <script>
         function confirmDeleteSpace(space) {
           return confirm('Are you sure you want to delete space ' + space + '?');
